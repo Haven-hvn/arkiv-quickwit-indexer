@@ -135,4 +135,4 @@ indexing_settings:
     max_merge_factor: 12
 
 search_settings:
-  default_search_fields: [body]
+  default_search_fields: [body, annotations.string]

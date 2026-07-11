@@ -21,16 +21,16 @@ published to the host is `127.0.0.1:8080` — the search page.
 - This folder checked out **next to** its two build contexts:
 
 ```
-workingfolder/
-├── arkiv-quickwit-stack/      ← this folder (compose file lives here)
-├── arkiv-quickwit-bridge/     ← bridge source (build context)
-└── quickwit-main/             ← quickwit source with ipfs backend (build context)
+Repos/
+├── arkiv-quickwit-indexer     ← bridge source (build context `..` from demo-docker-stack/)
+│   └── demo-docker-stack/     ← this folder (compose file lives here)
+└── quickwit/                  ← quickwit fork with ipfs backend (build context `../quickwit`)
 ```
 
 ## Run it
 
 ```bash
-cd arkiv-quickwit-stack
+cd E:\Repos\arkiv-quickwit-indexer\demo-docker-stack
 docker compose up -d --build
 ```
 
@@ -48,9 +48,9 @@ written on-chain. Try `*`, `op_type:create`, or
 | Service | Image | Role |
 | --- | --- | --- |
 | `kubo` | `ipfs/kubo:v0.32.1` | IPFS node in `test` profile + `--offline`: zero bootstrap peers, zero outbound traffic. Quickwit splits are stored here content-addressed (each split has a CID). RPC port 5001 is reachable only inside the compose network. |
-| `quickwit` | built from `../quickwit-main` | Quickwit with the `ipfs://` storage backend compiled in (`release-feature-set`). Metastore is file-backed on a named volume; splits go to kubo's MFS. |
+| `quickwit` | built from `../quickwit` | Quickwit with the `ipfs://` storage backend compiled in (`release-feature-set`). Metastore is file-backed on a named volume; splits go to kubo's MFS. |
 | `qw-init` | `curlimages/curl` | One-shot: creates the `arkiv` index from `quickwit-config/arkiv-index.yaml`. Idempotent — "already exists" is success. |
-| `bridge` | built from `../arkiv-quickwit-bridge` | Tails `EntityOperation`-family events from `https://braga.hoodi.arkiv.network/rpc` (legacy/OP-stack schema — braga has not migrated to the reth version), hydrates each entity, ingests into Quickwit, maps deletes/expiries to delete tasks. `start_block: "head"` = tip-only, no backfill. |
+| `bridge` | built from `..` (the arkiv-quickwit-indexer root) | Tails `EntityOperation`-family events from `https://braga.hoodi.arkiv.network/rpc` (legacy/OP-stack schema — braga has not migrated to the reth version), hydrates each entity, ingests into Quickwit, maps deletes/expiries to delete tasks. `start_block: "head"` = tip-only, no backfill. |
 | `frontend` | nginx | Static search page; proxies `/api/*` to Quickwit so the browser only ever talks to `localhost:8080`. |
 
 ## Configuration

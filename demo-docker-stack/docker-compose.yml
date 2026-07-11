@@ -35,8 +35,8 @@ services:
 
   quickwit:
     build:
-      context: ../quickwit-main
-      # Upstream Dockerfile; release-feature-set includes the ipfs backend.
+      context: ../quickwit
+      # Fork's Dockerfile; release-feature-set includes the ipfs backend.
     image: arkiv-stack/quickwit:latest
     command: ["run"]
     environment:
@@ -84,7 +84,7 @@ services:
 
   bridge:
     build:
-      context: ../arkiv-quickwit-bridge
+      context: ..
     image: arkiv-stack/bridge:latest
     volumes:
       - ./bridge-config/config.yaml:/etc/arkiv-quickwit-bridge/config.yaml:ro
