@@ -1,0 +1,138 @@
+#
+# Canonical Quickwit index config for the arkiv bridge (§8 of the design).
+# Install once:
+#   curl -XPOST http://<quickwit>:7280/api/v1/indexes \
+#     -H 'content-type: application/yaml' \
+#     --data-binary @arkiv-index.yaml
+#
+version: 0.9
+index_id: arkiv
+
+doc_mapping:
+  mode: strict
+  field_mappings:
+    # Dedup handle (design §6.3): keccak256(entity_key || block || log_index || op).
+    - name: _doc_id
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+
+    # === Identity / provenance ===
+    - name: entity_key
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+    - name: entity_address
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+    - name: code_hash
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+    - name: block_number
+      type: u64
+      stored: true
+      indexed: true
+      fast: true
+    - name: block_timestamp
+      type: datetime
+      input_formats: [unix_timestamp]
+      output_format: unix_timestamp_secs
+      stored: true
+      indexed: true
+      fast: true
+    - name: op_type
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+
+    # === Actors ===
+    - name: owner
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+    - name: creator
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+
+    # === Lifetime ===
+    - name: created_at_block
+      type: u64
+      stored: true
+      indexed: true
+      fast: true
+    - name: expires_at
+      type: u64
+      stored: true
+      indexed: true
+      fast: true
+    - name: last_modified_at_block
+      type: u64
+      stored: true
+      indexed: true
+      fast: true
+
+    # === Payload ===
+    - name: content_type
+      type: text
+      tokenizer: raw
+      stored: true
+      indexed: true
+      fast: true
+    # Google-cache property: the extracted payload text is stored as well
+    # as indexed, so a hit still carries its content after the entity
+    # expires on-chain (arkiv entities have a BTL; nodes do not retain
+    # expired history). `code_hash` still lets anyone verify a live entity.
+    - name: body
+      type: text
+      tokenizer: default
+      record: position
+      stored: true
+      indexed: true
+
+    # === Annotations — typed sub-bags ===
+    - name: annotations
+      type: object
+      field_mappings:
+        - name: string
+          type: json
+          stored: true
+          indexed: true
+          tokenizer: default
+        - name: uint
+          type: json
+          stored: true
+          indexed: true
+          fast: true
+        - name: entity_key
+          type: json
+          stored: true
+          indexed: true
+
+  timestamp_field: block_timestamp
+  tag_fields: [op_type, owner, content_type]
+
+indexing_settings:
+  commit_timeout_secs: 10
+  merge_policy:
+    type: stable_log
+    merge_factor: 8
+    max_merge_factor: 12
+
+search_settings:
+  default_search_fields: [body]

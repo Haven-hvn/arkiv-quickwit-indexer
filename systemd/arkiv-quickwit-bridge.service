@@ -1,0 +1,25 @@
+[Unit]
+Description=arkiv to Quickwit ingestion bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=arkiv-bridge
+Group=arkiv-bridge
+ExecStart=/usr/local/bin/arkiv-quickwit-bridge --config /etc/arkiv-quickwit-bridge/config.yaml
+Restart=on-failure
+RestartSec=5
+# Halt states (deep reorg, audit mismatch) exit non-zero on purpose;
+# cap restarts so a genuine halt gets operator attention instead of a
+# crash loop.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+StateDirectory=arkiv-quickwit-bridge
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/arkiv-quickwit-bridge
+
+[Install]
+WantedBy=multi-user.target

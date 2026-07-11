@@ -1,0 +1,114 @@
+# Arkiv → Quickwit search stack, fully local except:
+#   - outbound HTTPS to the arkiv RPC (bridge only)
+#   - port 8080 on localhost for the search page
+#
+#   docker compose up -d --build
+#   open http://localhost:8080
+#
+# Components:
+#   kubo      — offline IPFS node (test profile, no bootstrap peers, no
+#               outbound traffic); stores Quickwit splits, content-addressed
+#   quickwit  — search engine built with the ipfs:// storage backend
+#   qw-init   — one-shot: creates the `arkiv` index if missing
+#   bridge    — tails the braga hoodi chain tip into Quickwit
+#   frontend  — static search page + API proxy on localhost:8080
+
+services:
+  kubo:
+    image: ipfs/kubo:v0.32.1
+    environment:
+      # `test` profile: no bootstrap peers, localhost-only defaults —
+      # combined with --offline the node never talks to the public IPFS
+      # network. Splits stay on this machine.
+      IPFS_PROFILE: test
+    command: ["daemon", "--migrate=true", "--offline"]
+    volumes:
+      - ipfs-data:/data/ipfs
+    # RPC (5001) grants full node control: reachable only on the compose
+    # network, never published to the host.
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  quickwit:
+    build:
+      context: ../quickwit-main
+      # Upstream Dockerfile; release-feature-set includes the ipfs backend.
+    image: arkiv-stack/quickwit:latest
+    command: ["run"]
+    environment:
+      QW_CONFIG: /quickwit/config/quickwit.yaml
+    volumes:
+      - ./quickwit-config/quickwit.yaml:/quickwit/config/quickwit.yaml:ro
+      - qw-data:/quickwit/qwdata
+    depends_on:
+      kubo:
+        condition: service_healthy
+    healthcheck:
+      # The runtime image ships no curl/wget; bash /dev/tcp does the job.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/7280 && printf 'GET /health/livez HTTP/1.0\r\n\r\n' >&3 && grep -q '200' <&3"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  # One-shot: install the arkiv index (idempotent — 400 "already exists" is
+  # fine on restarts).
+  qw-init:
+    image: curlimages/curl:8.10.1
+    volumes:
+      - ./quickwit-config/arkiv-index.yaml:/arkiv-index.yaml:ro
+    depends_on:
+      quickwit:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        code=$$(curl -s -o /tmp/resp -w '%{http_code}' -XPOST \
+          http://quickwit:7280/api/v1/indexes \
+          -H 'content-type: application/yaml' \
+          --data-binary @/arkiv-index.yaml)
+        cat /tmp/resp; echo
+        if [ "$$code" = "200" ]; then echo 'index created'; exit 0; fi
+        if grep -q 'already exist' /tmp/resp; then echo 'index already exists'; exit 0; fi
+        echo "index creation failed with http $$code"; exit 1
+    restart: "no"
+
+  bridge:
+    build:
+      context: ../arkiv-quickwit-bridge
+    image: arkiv-stack/bridge:latest
+    volumes:
+      - ./bridge-config/config.yaml:/etc/arkiv-quickwit-bridge/config.yaml:ro
+      - bridge-state:/var/lib/arkiv-quickwit-bridge
+    depends_on:
+      qw-init:
+        condition: service_completed_successfully
+    environment:
+      RUST_LOG: info
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: arkiv-stack/frontend:latest
+    ports:
+      # The ONLY port published to the host.
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      quickwit:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ipfs-data:
+  qw-data:
+  bridge-state:

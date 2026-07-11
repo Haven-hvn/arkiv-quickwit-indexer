@@ -1,0 +1,78 @@
+# arkiv-quickwit-bridge configuration.
+# Pass via --config or the ARKIV_BRIDGE_CONFIG env var.
+
+arkiv:
+  rpc_url: "http://127.0.0.1:8545"
+  # rpc_url_backup: "http://127.0.0.1:8555"   # enables §9.3 paranoid dual-hydration
+  chain_id: 42069
+  # Event schema:
+  #   entity_operation (default) — arkiv-op-reth's EntityOperation event at
+  #     0x4400…0044, with historical (atBlock) hydration.
+  #   legacy — deployed networks (e.g. hoodi testnet): six ArkivEntity*
+  #     events at 0x…61726b6976; arkiv_query ignores atBlock there, so
+  #     hydration reads head state (fine for tail-only mode).
+  schema: entity_operation
+  # arkiv_address defaults per schema; set only to override.
+  # arkiv_address: "0x4400000000000000000000000000000000000044"
+  # First-launch crawl start. A block number backfills from there (0 =
+  # genesis); "head" skips backfill entirely and tails from the current
+  # chain height (no historical state reads). Restarts always resume from
+  # the persisted cursor regardless of this setting.
+  start_block: 0
+  confirmation_depth: 32        # blocks trailed behind head; reorg safety vs freshness
+  fetch_batch_size_blocks: 1024
+  http_timeout_secs: 30
+
+quickwit:
+  base_url: "http://127.0.0.1:7280"
+  index_id: "arkiv"
+  ingest_commit_mode: "auto"    # auto | wait_for | force
+  ingest_batch_size_docs: 500
+  ingest_batch_max_bytes: 1048576
+  http_timeout_secs: 30
+  http_retry:
+    max_attempts: 8
+    initial_backoff_ms: 200
+    max_backoff_ms: 30000
+    respect_429: true
+
+bridge:
+  state_store_path: "/var/lib/arkiv-quickwit-bridge/state.sqlite"
+  poll_interval_ms: 2000
+  dedup_window_blocks: 100000
+  max_delete_terms_per_task: 500
+  audit:
+    enabled: true
+    sample_every_n_blocks: 10000
+    sample_size: 20
+    mismatch_halt_threshold: 1
+  reorg:
+    retract_max_depth: 512
+    buffer_size: 256
+    recheck_sample_size: 8
+  metrics_listen_addr: "127.0.0.1:9464"
+
+# Optional: index only entities matching these annotation filters.
+# Empty / omitted = index everything. Rules OR together; `all_of`
+# conditions within a rule AND together. An update that moves an entity
+# out of the filtered set tombstones its previously indexed versions.
+#entity_filters:
+#  - string_annotation_key: type                       # has the key `type`
+#  - string_annotation_key: type                       # type == w3pups-telemetry
+#    string_annotation_value: w3pups-telemetry
+#  - all_of:                                           # both must hold
+#      - string_annotation_key: type
+#        string_annotation_value: w3pups-telemetry
+#      - string_annotation_key: device_id
+
+payload_extractors:
+  - content_type: "text/plain"
+    strategy: utf8_body
+  - content_type: "text/markdown"
+    strategy: utf8_body_strip_markdown
+  - content_type: "application/json"
+    strategy: json_flatten
+  - content_type: "text/html"
+    strategy: html_strip_tags
+  - content_type_prefix: "image/"
+    strategy: none

@@ -1,0 +1,40 @@
+# arkiv-quickwit-bridge config for the stack: tail the braga hoodi testnet
+# from the chain tip (no backfill) into the local Quickwit.
+arkiv:
+  rpc_url: "https://braga.hoodi.arkiv.network/rpc"
+  chain_id: 60138453102
+  # braga runs the deployed (pre-reth-migration) event schema.
+  schema: legacy
+  # Tail-only: resolve the chain height at first launch, index forward.
+  start_block: "head"
+  confirmation_depth: 32
+  fetch_batch_size_blocks: 900
+  http_timeout_secs: 60
+
+quickwit:
+  base_url: "http://quickwit:7280"
+  index_id: "arkiv"
+  ingest_commit_mode: "auto"
+  http_retry:
+    max_attempts: 10
+    initial_backoff_ms: 500
+    max_backoff_ms: 30000
+
+# Optional: index only entities with particular string annotations.
+# Rules OR together; `all_of` conditions AND together. Omit to index all.
+#entity_filters:
+#  - string_annotation_key: type
+#    string_annotation_value: w3pups-telemetry
+#  - all_of:
+#      - string_annotation_key: type
+#      - string_annotation_key: device_id
+
+bridge:
+  state_store_path: "/var/lib/arkiv-quickwit-bridge/state.sqlite"
+  poll_interval_ms: 2000
+  audit:
+    enabled: false   # legacy nodes have no historical reads to audit against
+  reorg:
+    retract_max_depth: 512
+    recheck_sample_size: 4
+  metrics_listen_addr: "0.0.0.0:9464"

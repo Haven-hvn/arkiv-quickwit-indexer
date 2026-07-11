@@ -1,0 +1,31 @@
+[package]
+name = "arkiv-quickwit-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "External daemon that tails an arkiv-op-reth node's EntityOperation stream and ingests it into a stock Quickwit cluster over the public HTTP APIs"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.7", default-features = false, features = ["http1", "tokio"] }
+clap = { version = "4", features = ["derive", "env"] }
+futures = "0.3"
+hex = "0.4"
+prometheus = { version = "0.13", default-features = false }
+pulldown-cmark = { version = "0.12", default-features = false }
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha3 = "0.10"
+thiserror = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-util = "0.7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"

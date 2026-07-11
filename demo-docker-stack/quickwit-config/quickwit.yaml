@@ -1,0 +1,12 @@
+# Quickwit node config for the arkiv stack. Splits live on the local IPFS
+# node (kubo) via the ipfs:// storage backend; the metastore is file-backed
+# on a named volume.
+version: 0.8
+node_id: arkiv-quickwit
+listen_address: 0.0.0.0
+data_dir: /quickwit/qwdata
+metastore_uri: file:///quickwit/qwdata/metastore
+default_index_root_uri: ipfs://quickwit-indexes
+storage:
+  ipfs:
+    api_endpoint: http://kubo:5001
